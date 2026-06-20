@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MIRROR — AI Pose &amp; Posture Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="tagline">AI-Powered Fit Mirror for Real-Time Pose Detection</span>
+  </div>
+  <div class="header-right">
+    <button class="theme-toggle" id="btnDashboard">📊 Dashboard</button>
+    <button class="theme-toggle" id="btnTheme">🌙 Dark</button>
+    <div class="model-pill">
+      <span class="dot loading" id="modelDot"></span>
+      <span id="modelStatusText">Loading pose model…</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: Controls + Advanced -->
+  <div class="sidebar">
+    <div class="panel">
+      <h2>Input</h2>
+      <button class="btn primary" id="btnImage" disabled>
+        <span class="icon">🖼</span> Upload image
+      </button>
+      <button class="btn primary" id="btnVideo" disabled>
+        <span class="icon">🎞</span> Upload video
+      </button>
+      <button class="btn primary" id="btnWebcam" disabled>
+        <span class="icon">📷</span> Start webcam
+      </button>
+      <input type="file" id="fileImage" accept="image/*" />
+      <input type="file" id="fileVideo" accept="video/*" />
+
+      <hr class="div" />
+
+      <h2>Playback</h2>
+      <div class="btn-row">
+        <button class="btn" id="btnPause" disabled>⏸ Pause</button>
+        <button class="btn danger" id="btnStop" disabled>⏹ Stop</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Exercise mode</h2>
+      <div class="field">
+        <select id="exerciseMode">
+          <option value="none">Posture only</option>
+          <option value="squat">Squat counter</option>
+          <option value="pushup">Push-up counter</option>
+          <option value="curl">Bicep curl counter</option>
+        </select>
+      </div>
+      <button class="btn" id="btnResetReps">↺ Reset rep count</button>
+    </div>
+
+    <div class="panel">
+      <h2>Advanced settings</h2>
+
+      <div class="field">
+        <label>Detection confidence — <span class="field-value" id="confVal">30%</span></label>
+        <input type="range" id="confSlider" min="10" max="70" step="5" value="30" />
+      </div>
+
+      <div class="field">
+        <label>Model quality</label>
+        <select id="modelQuality">
+          <option value="lightning">Lightning — fastest</option>
+          <option value="thunder">Thunder — most accurate</option>
+        </select>
+      </div>
+
+      <div class="toggle-row">
+        <span>Multi-person mode</span>
+        <label class="switch"><input type="checkbox" id="toggleMulti" /><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Mirror webcam</span>
+        <label class="switch"><input type="checkbox" id="toggleMirror" checked /><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Keypoint smoothing</span>
+        <label class="switch"><input type="checkbox" id="toggleSmooth" checked /><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Voice feedback</span>
+        <label class="switch"><input type="checkbox" id="toggleVoice" /><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Status</h2>
+      <div id="statusLog"></div>
+    </div>
+  </div>
+
+  <!-- CENTER: Viewport -->
+  <div class="viewport-wrap">
+    <div class="stage" id="stage">
+      <video id="videoEl" playsinline muted style="display:none;"></video>
+      <canvas id="canvas"></canvas>
+      <div class="reticle">
+        <i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i>
+      </div>
+      <div class="scanline" id="scanline"></div>
+      <div class="fps-chip" id="fpsChip" style="display:none;">FPS <b id="fpsVal">0</b></div>
+      <div class="rep-chip" id="repChip">REPS <b id="repChipVal">0</b></div>
+      <div class="empty-state" id="emptyState">
+        <div class="glyph">◎</div>
+        <strong>No input yet</strong>
+        <span>Upload an image or video, or start your webcam, to begin pose analysis.</span>
+      </div>
+    </div>
+
+    <div class="stage-controls">
+      <div class="mode-tag">Mode: <b id="modeLabel">Idle</b></div>
+      <div class="stage-actions">
+        <button class="btn" id="btnSnapshot" disabled>📸 Snapshot</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Feedback -->
+  <div class="sidebar">
+    <div class="panel">
+      <h2>Posture score</h2>
+      <div class="score-block">
+        <span class="score-num dim" id="scoreNum">—</span>
+        <span class="score-label">/ 100</span>
+      </div>
+
+      <div class="checks">
+        <div class="check-row">
+          <span class="check-dot" id="dotBack"></span>
+          <span class="label">Back alignment</span>
+          <span class="val" id="valBack">—</span>
+        </div>
+        <div class="check-row">
+          <span class="check-dot" id="dotShoulders"></span>
+          <span class="label">Shoulder level</span>
+          <span class="val" id="valShoulders">—</span>
+        </div>
+        <div class="check-row">
+          <span class="check-dot" id="dotKnees"></span>
+          <span class="label">Knee alignment</span>
+          <span class="val" id="valKnees">—</span>
+        </div>
+      </div>
+
+      <div id="feedbackMsg">Waiting for input…</div>
+
+      <div class="rep-block" id="repBlock">
+        <hr class="div" />
+        <div class="rep-row">
+          <span class="rep-num" id="repNum">0</span>
+          <span class="rep-meta" id="repMeta">reps · phase <b id="repPhase">—</b> · angle <b id="repAngle">—</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel session-block">
+      <h2>
+        Session
+        <button class="mini-btn" id="btnExport">Export CSV ↓</button>
+      </h2>
+      <canvas id="sparkline" width="260" height="54"></canvas>
+      <div class="session-stats">
+        <span>Avg score <b id="statAvg">—</b></span>
+        <span>Duration <b id="statDuration">00:00</b></span>
+        <span>Samples <b id="statSamples">0</b></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ---------- Dashboard modal ---------- -->
+<div class="dash-overlay" id="dashOverlay">
+  <div class="dash-modal">
+    <div class="dash-head">
+      <div class="dash-tabs">
+        <button class="dash-tab active" data-tab="overview">Overview</button>
+        <button class="dash-tab" data-tab="history">History</button>
+        <button class="dash-tab" data-tab="trends">Trends</button>
+        <button class="dash-tab" data-tab="exercise">Exercise</button>
+        <button class="dash-tab" data-tab="people">People</button>
+      </div>
+      <button class="dash-close" id="dashClose">✕</button>
+    </div>
+
+    <div class="dash-viewing" id="dashViewing" style="display:none;">
+      Viewing past session — <button class="mini-btn" id="dashBackLive">← Back to live</button>
+    </div>
+
+    <div class="dash-body">
+
+      <!-- Overview -->
+      <div class="dash-pane active" id="paneOverview">
+        <div class="dash-empty" id="overviewEmpty">No session data yet. Start an input to begin tracking.</div>
+        <div id="overviewContent" style="display:none;">
+          <div class="ov-grid">
+            <div class="ov-card">
+              <span class="ov-label">Avg posture score</span>
+              <span class="ov-num" id="ovScore">—</span>
+            </div>
+            <div class="ov-card">
+              <span class="ov-label">Duration</span>
+              <span class="ov-num" id="ovDuration">00:00</span>
+            </div>
+            <div class="ov-card">
+              <span class="ov-label">Total reps</span>
+              <span class="ov-num" id="ovReps">0</span>
+            </div>
+            <div class="ov-card">
+              <span class="ov-label">Mode</span>
+              <span class="ov-num small" id="ovMode">—</span>
+            </div>
+          </div>
+          <div class="ov-snap-row">
+            <img id="ovSnapshot" class="ov-snapshot" alt="Session snapshot" />
+            <div class="ov-snap-meta">
+              <div id="ovTimestamp" class="ov-timestamp">—</div>
+              <button class="btn" id="ovExport">Export CSV ↓</button>
+              <button class="btn primary" id="ovPdf">📄 Download PDF report</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="dash-pane" id="paneHistory">
+        <div class="dash-empty" id="historyEmpty">No past sessions yet in this tab. Stop a session to save it here.</div>
+        <div id="historyList"></div>
+      </div>
+
+      <!-- Trends -->
+      <div class="dash-pane" id="paneTrends">
+        <div class="dash-empty" id="trendsEmpty">No posture data yet.</div>
+        <div id="trendsContent" style="display:none;">
+          <canvas id="trendsChart" width="760" height="220"></canvas>
+          <div class="trend-legend">
+            <span><i class="sw" style="background:var(--cyan)"></i>Back</span>
+            <span><i class="sw" style="background:var(--violet)"></i>Shoulders</span>
+            <span><i class="sw" style="background:var(--coral)"></i>Knees</span>
+            <span class="worst-note" id="worstNote">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exercise analytics -->
+      <div class="dash-pane" id="paneExercise">
+        <div class="dash-empty" id="exerciseEmpty">No reps logged yet. Pick an exercise mode and start moving.</div>
+        <div id="exerciseContent" style="display:none;">
+          <canvas id="exerciseChart" width="760" height="160"></canvas>
+          <table class="ex-table" id="exerciseTable">
+            <thead><tr><th>Exercise</th><th>Reps</th><th>Avg tempo</th><th>Fastest</th><th>Slowest</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- People -->
+      <div class="dash-pane" id="panePeople">
+        <div class="dash-empty" id="peopleEmpty">Multi-person mode is off, or only one person is in frame. Enable “Multi-person mode” in Advanced settings and step a second person into view.</div>
+        <div class="people-grid" id="peopleGrid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>Runs entirely in your browser — no images or video leave your device.</footer>
+
+<!-- TensorFlow.js + Pose Detection (MoveNet) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+
+<script src="app.js"></script>
+</body>
+</html>
